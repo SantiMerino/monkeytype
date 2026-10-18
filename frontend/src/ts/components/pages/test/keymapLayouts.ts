@@ -474,6 +474,81 @@ const aliceIso: KeymapLayout = [
   ]),
   aliceBottomRow,
 ];
+// column stagger of the cornix lp, outer column to inner column
+const cornixLeftStagger = [0.3, 0.3, 0.15, 0, 0.15, 0.3];
+const cornixRightStagger = [0.3, 0.15, 0, 0.15, 0.3, 0.3];
+const cornixHalfGap = 2.5;
+
+function cornixRow(
+  row: keyof LayoutObject["keys"],
+  left: LayoutKey[],
+  right: LayoutKey[],
+): LayoutKey[] {
+  return buildRow(row, [
+    ...left.map((key, i) => ({ ...key, y: cornixLeftStagger[i] })),
+    ...right.map((key, i) => ({
+      ...key,
+      y: cornixRightStagger[i],
+      ...(i === 0 ? { x: cornixHalfGap } : {}),
+    })),
+  ]);
+}
+
+const cornix: KeymapLayout = [
+  [], //no number row on the cornix
+  cornixRow(
+    "row2",
+    [{ legend: "Tab", isExtraKey: true }, ...addLayoutKeys(5)],
+    [
+      ...addLayoutKeys(5, { start: 5 }),
+      { legend: BackspaceShort, isExtraKey: true },
+    ],
+  ),
+  cornixRow(
+    "row3",
+    [
+      { legend: "Caps", isExtraKey: true },
+      ...addLayoutKeys(3),
+      { layoutPosition: { col: 3 }, isHoming: true },
+      { layoutPosition: { col: 4 } },
+    ],
+    [
+      { layoutPosition: { col: 5 } },
+      { layoutPosition: { col: 6 }, isHoming: true },
+      ...addLayoutKeys(3, { start: 7 }),
+      { legend: EnterShort, isExtraKey: true },
+    ],
+  ),
+  cornixRow(
+    "row4",
+    [{ legend: Shift, isExtraKey: true }, ...addLayoutKeys(5)],
+    [
+      ...addLayoutKeys(5, { start: 5 }),
+      { layoutPosition: { row: "row3", col: 10 }, isExtraKey: true },
+    ],
+  ),
+  [
+    { legend: Ctrl, isExtraKey: true, y: 0.3 },
+    { legend: Meta, isExtraKey: true, y: 0.3 },
+    { legend: Alt, isExtraKey: true, y: 0.15 },
+    { legend: "", isExtraKey: true, x: 1, y: 0.45 },
+    {
+      isLayoutIndicator: true,
+      x: 4,
+      y: 0.6,
+      rotation: 12,
+      extraKeysOverride: { x: 0 },
+    },
+    { legend: " ", y: 0.85, rotation: 24 },
+    { legend: " ", x: 0.5, y: 0.85, rotation: -24 },
+    { legend: "Raise", isExtraKey: true, y: 0.6, rotation: -12 },
+    { legend: "", isExtraKey: true, y: 0.45 },
+    { legend: "←", isExtraKey: true, x: 1, y: 0.15 },
+    { legend: "↓", isExtraKey: true, y: 0.3 },
+    { legend: "→", isExtraKey: true, y: 0.3 },
+  ],
+];
+
 export const keymapLayouts: Partial<
   Record<KeymapStyle, Partial<Record<LayoutObject["type"], KeymapLayout>>>
 > = {
@@ -487,6 +562,8 @@ export const keymapLayouts: Partial<
   split_matrix: { iso: splitMatrix, ansi: splitMatrix },
 
   alice: { iso: aliceIso, ansi: alice },
+
+  cornix: { iso: cornix, ansi: cornix },
 };
 
 function buildRow(

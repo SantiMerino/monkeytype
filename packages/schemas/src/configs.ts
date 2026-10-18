@@ -112,6 +112,7 @@ export const KeymapStyleSchema = z.enum([
   "split_matrix",
   "steno",
   "steno_matrix",
+  "cornix",
 ]);
 export type KeymapStyle = z.infer<typeof KeymapStyleSchema>;
 

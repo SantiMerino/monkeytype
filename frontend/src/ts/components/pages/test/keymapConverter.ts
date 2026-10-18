@@ -59,7 +59,10 @@ export function getFinger(options: {
   const { row, col, layoutType, keymapStyle, rotation } = options;
   if (row === "row5") return "thumb";
 
-  const isMatrix = keymapStyle === "matrix" || keymapStyle === "split_matrix";
+  const isMatrix =
+    keymapStyle === "matrix" ||
+    keymapStyle === "split_matrix" ||
+    keymapStyle === "cornix";
 
   // number row and the iso extra key (left of z) shift columns by one
   let column = col;

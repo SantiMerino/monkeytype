@@ -1128,7 +1128,13 @@ describe("keymap converter", () => {
 
 describe("finger zones", () => {
   const fingersOf = (
-    keymapStyle: "staggered" | "split" | "matrix" | "split_matrix" | "alice",
+    keymapStyle:
+      | "staggered"
+      | "split"
+      | "matrix"
+      | "split_matrix"
+      | "alice"
+      | "cornix",
     layout: unknown,
   ): string[][] =>
     convertLayoutToKeymap(layout as LayoutObject, {
@@ -1196,5 +1202,52 @@ describe("finger zones", () => {
   it("puts the duplicated alice center key on both hands", () => {
     const [, , , row4] = fingersOf("alice", qwertyLayout);
     expect(row4?.slice(4, 6)).toEqual(["b:leftIndex", "b:rightIndex"]);
+  });
+
+  it("assigns fingers on cornix", () => {
+    const [row1, row2, row3, row4, row5] = fingersOf("cornix", qwertyLayout);
+    expect(row1).toEqual([]);
+    expect(row2?.slice(4, 6)).toEqual(["t:leftIndex", "y:rightIndex"]);
+    expect(row3?.at(-1)).toEqual(";:rightPinky");
+    expect(row4?.at(0)).toEqual("z:leftPinky");
+    expect(row5).toEqual([" :thumb", " :thumb", " :thumb"]);
+  });
+});
+
+describe("cornix", () => {
+  it("staggers columns and splits the halves", () => {
+    const [, row2, , row4] = convertLayoutToKeymap(
+      qwertyLayout as LayoutObject,
+      { keymapStyle: "cornix", showAllKeys: false },
+    );
+    expect(row2?.map((key) => key.y)).toEqual([
+      0.3, 0.15, 0, 0.15, 0.3, 0.3, 0.15, 0, 0.15, 0.3,
+    ]);
+    expect(row2?.[5]).toEqual({ ...expectLegend("y", "Y"), x: 2.5, y: 0.3 });
+    expect(row4?.map((key) => key.legends[0])).toEqual([
+      "z",
+      "x",
+      "c",
+      "v",
+      "b",
+      "n",
+      "m",
+      ",",
+      ".",
+      "/",
+    ]);
+  });
+
+  it("shows outer columns and thumb cluster with all keys", () => {
+    const [, row2, row3, row4, row5] = convertLayoutToKeymap(
+      qwertyLayout as LayoutObject,
+      { keymapStyle: "cornix", showAllKeys: true },
+    );
+    expect(row2?.at(0)?.legends[0]).toEqual("Tab");
+    expect(row2?.at(-1)?.legends[0]).toEqual(BackspaceShort);
+    expect(row3?.at(-1)?.legends[0]).toEqual(EnterShort);
+    expect(row4?.at(-1)?.legends[0]).toEqual("'");
+    expect(row5).toHaveLength(12);
+    expect(row5?.filter((key) => key.rotation !== undefined)).toHaveLength(4);
   });
 });
