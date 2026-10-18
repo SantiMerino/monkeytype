@@ -19,7 +19,12 @@ import { blendTwoHexColors, hexToHSL } from "../../../utils/colors";
 import { isMacLike } from "../../../utils/misc";
 import { Anime } from "../../common/anime";
 import { Button } from "../../common/Button";
-import { convertLayoutToKeymap } from "./keymapConverter";
+import {
+  convertLayoutToKeymap,
+  findKeyCombo,
+  isKeyInCombo,
+  KeyCombo,
+} from "./keymapConverter";
 import { Finger, KeyboardDefinition, KeyDefinition } from "./keymapLayouts";
 
 const symbolsPattern = /^[^\p{L}\p{N}]{1}$/u;
@@ -122,6 +127,10 @@ function KeyboardDefinitionRenderer(props: {
   showFirstRow: boolean;
   flashState: Record<string, FlashEntry | undefined>;
 }) {
+  const combo = createMemo(() =>
+    findKeyCombo(props.keyboardDef, getKeymapHighlightKey()),
+  );
+
   return (
     <div
       class="w-fit xxs:zoom-(--kb-zoom-xxs) xs:zoom-(--kb-zoom-xs) sm:zoom-(--kb-zoom-sm) md:zoom-(--kb-zoom-md) lg:zoom-(--kb-zoom-lg) xl:zoom-(--kb-zoom-xl) 2xl:zoom-(--kb-zoom-2xl)"
@@ -158,12 +167,23 @@ function KeyboardDefinitionRenderer(props: {
                     }
                     return label ?? "";
                   };
+                  const layerLabel = () => {
+                    if (props.layer.index < 0) return "";
+                    const legends = key.layerLegends?.legends;
+                    return legends?.[props.layer.index === 1 ? 1 : 0] ?? "";
+                  };
                   const flashEntry = () =>
                     key.legends
                       .map((legend) => props.flashState[legend])
                       .find((it) => it !== undefined);
                   return (
-                    <Key {...key} label={label()} flashEntry={flashEntry} />
+                    <Key
+                      {...key}
+                      label={label()}
+                      layerLabel={layerLabel()}
+                      flashEntry={flashEntry}
+                      combo={combo}
+                    />
                   );
                 }}
               </For>
@@ -178,7 +198,9 @@ function KeyboardDefinitionRenderer(props: {
 function Key(
   props: {
     label: string;
+    layerLabel: string;
     flashEntry: () => FlashEntry | undefined;
+    combo: () => KeyCombo | undefined;
   } & KeyDefinition,
 ) {
   const isSteno = () =>
@@ -198,15 +220,13 @@ function Key(
     };
   });
 
-  const isNext = createMemo(
-    () =>
-      getConfig.keymapMode === "next" &&
-      !isSteno() &&
-      props.legends?.some((legend) => legend === getKeymapHighlightKey()),
+  const keyMatchesHighlight = createMemo(() =>
+    isKeyInCombo(props, getKeymapHighlightKey(), props.combo()),
   );
 
-  const keyMatchesHighlight = createMemo(() =>
-    props.legends?.some((legend) => legend === getKeymapHighlightKey()),
+  const isNext = createMemo(
+    () =>
+      getConfig.keymapMode === "next" && !isSteno() && keyMatchesHighlight(),
   );
 
   // Fade when leaving "next" mode
@@ -335,6 +355,11 @@ function Key(
         fallback={
           <>
             {props.label}
+            <Show when={props.layerLabel !== ""}>
+              <span class="absolute top-0.5 right-1 text-[0.7em] leading-none opacity-80">
+                {props.layerLabel}
+              </span>
+            </Show>
             <Show when={props.isHoming}>
               <div
                 class={cn(

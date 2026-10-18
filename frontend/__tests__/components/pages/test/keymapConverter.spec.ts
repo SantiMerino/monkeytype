@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { convertLayoutToKeymap } from "../../../../src/ts/components/pages/test/keymapConverter";
+import {
+  convertLayoutToKeymap,
+  findKeyCombo,
+  isKeyInCombo,
+} from "../../../../src/ts/components/pages/test/keymapConverter";
 
 import qwertyLayout from "../../../../static/layouts/qwerty.json";
 import qwertzLayout from "../../../../static/layouts/qwertz.json";
@@ -13,6 +17,7 @@ import {
   Hyper,
   HyperShort,
   Meta,
+  KeyboardDefinition,
   Shift,
 } from "../../../../src/ts/components/pages/test/keymapLayouts";
 
@@ -1203,51 +1208,95 @@ describe("finger zones", () => {
     const [, , , row4] = fingersOf("alice", qwertyLayout);
     expect(row4?.slice(4, 6)).toEqual(["b:leftIndex", "b:rightIndex"]);
   });
-
-  it("assigns fingers on cornix", () => {
-    const [row1, row2, row3, row4, row5] = fingersOf("cornix", qwertyLayout);
-    expect(row1).toEqual([]);
-    expect(row2?.slice(4, 6)).toEqual(["t:leftIndex", "y:rightIndex"]);
-    expect(row3?.at(-1)).toEqual(";:rightPinky");
-    expect(row4?.at(0)).toEqual("z:leftPinky");
-    expect(row5).toEqual([" :thumb", " :thumb", " :thumb"]);
-  });
 });
 
 describe("cornix", () => {
+  const cornix = (
+    showAllKeys: boolean,
+    layout: unknown = qwertyLayout,
+  ): KeyboardDefinition =>
+    convertLayoutToKeymap(layout as LayoutObject, {
+      keymapStyle: "cornix",
+      showAllKeys,
+      fingerZones: true,
+    });
+  const legendsOf = (
+    row: { legends: string[] }[] | undefined,
+  ): (string | undefined)[] | undefined => row?.map((key) => key.legends[0]);
+
+  it("follows the factory base layer", () => {
+    const [row1, row2, row3, row4] = cornix(false);
+    expect(row1).toEqual([]);
+    expect(legendsOf(row2)).toEqual("qwertyuiop".split(""));
+    expect(legendsOf(row3)).toEqual([..."asdfghjkl", "\\"]);
+    expect(legendsOf(row4)).toEqual([Shift, ..."zxcvbnm,./"]);
+  });
+
   it("staggers columns and splits the halves", () => {
-    const [, row2, , row4] = convertLayoutToKeymap(
-      qwertyLayout as LayoutObject,
-      { keymapStyle: "cornix", showAllKeys: false },
-    );
+    const [, row2] = cornix(false);
     expect(row2?.map((key) => key.y)).toEqual([
       0.3, 0.15, 0, 0.15, 0.3, 0.3, 0.15, 0, 0.15, 0.3,
     ]);
-    expect(row2?.[5]).toEqual({ ...expectLegend("y", "Y"), x: 2.5, y: 0.3 });
-    expect(row4?.map((key) => key.legends[0])).toEqual([
-      "z",
-      "x",
-      "c",
-      "v",
-      "b",
-      "n",
-      "m",
-      ",",
-      ".",
-      "/",
-    ]);
+    expect(row2?.[0]?.x).toEqual(1);
+    expect(row2?.[5]?.x).toEqual(2.5);
   });
 
-  it("shows outer columns and thumb cluster with all keys", () => {
-    const [, row2, row3, row4, row5] = convertLayoutToKeymap(
-      qwertyLayout as LayoutObject,
-      { keymapStyle: "cornix", showAllKeys: true },
+  it("shows symbol layer legends", () => {
+    const [, row2, row3] = cornix(false);
+    expect(row2?.map((key) => key.layerLegends?.legends[0])).toEqual(
+      "1234567890".split(""),
     );
-    expect(row2?.at(0)?.legends[0]).toEqual("Tab");
-    expect(row2?.at(-1)?.legends[0]).toEqual(BackspaceShort);
-    expect(row3?.at(-1)?.legends[0]).toEqual(EnterShort);
-    expect(row4?.at(-1)?.legends[0]).toEqual("'");
-    expect(row5).toHaveLength(12);
-    expect(row5?.filter((key) => key.rotation !== undefined)).toHaveLength(4);
+    expect(row3?.[3]?.layerLegends).toEqual({
+      layer: 1,
+      legends: [";", ":", "", ""],
+    });
+    expect(row3?.[5]?.layerLegends?.legends[0]).toEqual("=");
+    expect(row3?.[6]?.layerLegends?.legends[0]).toEqual("'");
+  });
+
+  it("maps iso keys by keycode", () => {
+    const [, , row3, row4] = cornix(false, qwertzLayout);
+    expect(row3?.at(-1)?.legends[0]).toEqual("#");
+    expect(row4?.[1]?.legends[0]).toEqual("y");
+    expect(row4?.at(-1)?.legends[0]).toEqual("-");
+  });
+
+  it("assigns fingers including outer columns and thumbs", () => {
+    const [, row2, , row4, row5] = cornix(true);
+    expect(row2?.map((key) => key.finger)).toEqual([
+      "leftPinky",
+      "leftPinky",
+      "leftRing",
+      "leftMiddle",
+      "leftIndex",
+      "leftIndex",
+      "rightIndex",
+      "rightIndex",
+      "rightMiddle",
+      "rightRing",
+      "rightPinky",
+      "rightPinky",
+    ]);
+    expect(row4?.[0]?.finger).toEqual("leftPinky");
+    expect(
+      row5?.filter((key) => key.finger === "thumb").map((k) => k.legends[0]),
+    ).toEqual(["L1", " ", " ", " ", "Raise", ""]);
+  });
+
+  it("highlights layer and shift keys needed for a character", () => {
+    const keyboard = cornix(false);
+    const keysFor = (character: string): (string | undefined)[] => {
+      const combo = findKeyCombo(keyboard, character);
+      return keyboard
+        .flat()
+        .filter((key) => isKeyInCombo(key, character, combo))
+        .map((key) => key.legends[0]);
+    };
+    expect(keysFor("a")).toEqual(["a"]);
+    expect(keysFor("A")).toEqual(["a", Shift]);
+    expect(keysFor("1")).toEqual(["q", "L1"]);
+    expect(keysFor("!")).toEqual(["q", Shift, "L1"]);
+    expect(keysFor(":")).toEqual(["f", Shift, "L1"]);
+    expect(keysFor("~")).toEqual([]);
   });
 });

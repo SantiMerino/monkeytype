@@ -45,6 +45,11 @@ export type KeyDefinition = {
   isHoming?: boolean;
   align?: "top";
   finger?: Finger;
+  /** legends reachable by holding a layer key, e.g. digits on a 40% board */
+  layerLegends?: { layer: number; legends: string[] };
+  /** holding this key switches to the given layer */
+  activatesLayer?: number;
+  isShift?: boolean;
 };
 export type KeyboardDefinition = KeyDefinition[][];
 
@@ -52,8 +57,9 @@ type LayoutPosition = {
   row?: keyof LayoutObject["keys"];
   col: number;
 };
-type LayoutKey = Omit<KeyDefinition, "legends"> & {
+type LayoutKey = Omit<KeyDefinition, "legends" | "layerLegends"> & {
   isExtraKey?: boolean;
+  layerPosition?: { layer: number } & Required<LayoutPosition>;
   extraKeysOverride?: Omit<KeyDefinition, "legends">;
   layoutPosition?: LayoutPosition;
 } & OneOf<{
@@ -474,80 +480,149 @@ const aliceIso: KeymapLayout = [
   ]),
   aliceBottomRow,
 ];
-// column stagger of the cornix lp, outer column to inner column
+// cornix lp, based on the official factory keymap
+// column stagger and fingers per column, outer column to inner column
 const cornixLeftStagger = [0.3, 0.3, 0.15, 0, 0.15, 0.3];
 const cornixRightStagger = [0.3, 0.15, 0, 0.15, 0.3, 0.3];
+const cornixLeftFingers: Finger[] = [
+  "leftPinky",
+  "leftPinky",
+  "leftRing",
+  "leftMiddle",
+  "leftIndex",
+  "leftIndex",
+];
+const cornixRightFingers: Finger[] = [
+  "rightIndex",
+  "rightIndex",
+  "rightMiddle",
+  "rightRing",
+  "rightPinky",
+  "rightPinky",
+];
 const cornixHalfGap = 2.5;
+const cornixSymbolLayer = 1;
 
-function cornixRow(
-  row: keyof LayoutObject["keys"],
-  left: LayoutKey[],
-  right: LayoutKey[],
-): LayoutKey[] {
-  return buildRow(row, [
-    ...left.map((key, i) => ({ ...key, y: cornixLeftStagger[i] })),
+function cornixRow(left: LayoutKey[], right: LayoutKey[]): LayoutKey[] {
+  return [
+    ...left.map((key, i) => ({
+      finger: cornixLeftFingers[i],
+      ...key,
+      y: cornixLeftStagger[i],
+    })),
     ...right.map((key, i) => ({
+      finger: cornixRightFingers[i],
       ...key,
       y: cornixRightStagger[i],
       ...(i === 0 ? { x: cornixHalfGap } : {}),
     })),
-  ]);
+  ];
 }
 
-const cornix: KeymapLayout = [
-  [], //no number row on the cornix
-  cornixRow(
-    "row2",
-    [{ legend: "Tab", isExtraKey: true }, ...addLayoutKeys(5)],
+function cornixKey(
+  row: keyof LayoutObject["keys"],
+  col: number,
+  symbolLayer?: { row: keyof LayoutObject["keys"]; col: number },
+): LayoutKey {
+  return {
+    layoutPosition: { row, col },
+    ...(symbolLayer !== undefined
+      ? { layerPosition: { layer: cornixSymbolLayer, ...symbolLayer } }
+      : {}),
+  };
+}
+
+function buildCornix(type: LayoutObject["type"]): KeymapLayout {
+  // iso has an extra key left of z, and backslash sits next to enter
+  const bottom = type === "iso" ? 1 : 0;
+  const backslash =
+    type === "iso" ? cornixKey("row3", 11) : cornixKey("row2", 12);
+
+  // rows without the outer column start one key to the right
+  const firstAlpha = { x: 1, extraKeysOverride: { x: 0 } };
+
+  return [
+    [], //no number row, digits live on the symbol layer
+    cornixRow(
+      [
+        { legend: "Tab", isExtraKey: true },
+        { ...cornixKey("row2", 0, { row: "row1", col: 1 }), ...firstAlpha },
+        cornixKey("row2", 1, { row: "row1", col: 2 }),
+        cornixKey("row2", 2, { row: "row1", col: 3 }),
+        cornixKey("row2", 3, { row: "row1", col: 4 }),
+        cornixKey("row2", 4, { row: "row1", col: 5 }),
+      ],
+      [
+        cornixKey("row2", 5, { row: "row1", col: 6 }),
+        cornixKey("row2", 6, { row: "row1", col: 7 }),
+        cornixKey("row2", 7, { row: "row1", col: 8 }),
+        cornixKey("row2", 8, { row: "row1", col: 9 }),
+        cornixKey("row2", 9, { row: "row1", col: 10 }),
+        { legend: BackspaceShort, isExtraKey: true },
+      ],
+    ),
+    cornixRow(
+      [
+        { legend: "Caps", isExtraKey: true },
+        { ...cornixKey("row3", 0), ...firstAlpha },
+        cornixKey("row3", 1),
+        cornixKey("row3", 2),
+        { ...cornixKey("row3", 3, { row: "row3", col: 9 }), isHoming: true },
+        cornixKey("row3", 4, { row: "row1", col: 11 }),
+      ],
+      [
+        cornixKey("row3", 5, { row: "row1", col: 12 }),
+        { ...cornixKey("row3", 6, { row: "row3", col: 10 }), isHoming: true },
+        cornixKey("row3", 7),
+        cornixKey("row3", 8),
+        backslash,
+        { legend: EnterShort, isExtraKey: true },
+      ],
+    ),
+    cornixRow(
+      [
+        { legend: Shift, isShift: true },
+        ...[0, 1, 2, 3, 4].map((col) => cornixKey("row4", col + bottom)),
+      ],
+      [
+        ...[5, 6, 7, 8].map((col) => cornixKey("row4", col + bottom)),
+        { legend: "↑", isExtraKey: true },
+        {
+          ...cornixKey("row4", 9 + bottom),
+          x: 1,
+          extraKeysOverride: { x: 0 },
+        },
+      ],
+    ),
     [
-      ...addLayoutKeys(5, { start: 5 }),
-      { legend: BackspaceShort, isExtraKey: true },
+      { legend: Ctrl, isExtraKey: true, y: 0.3, finger: "leftPinky" },
+      { legend: Meta, isExtraKey: true, y: 0.3, finger: "leftPinky" },
+      { legend: Alt, isExtraKey: true, y: 0.15, finger: "leftRing" },
+      {
+        legend: `L${cornixSymbolLayer}`,
+        activatesLayer: cornixSymbolLayer,
+        finger: "thumb",
+        x: 4,
+        y: 0.45,
+        extraKeysOverride: { x: 1 },
+      },
+      { isLayoutIndicator: true, y: 0.6, rotation: 12 },
+      { legend: " ", y: 0.85, rotation: 24 },
+      { legend: " ", x: 0.5, y: 0.85, rotation: -24 },
+      {
+        legend: "Raise",
+        isExtraKey: true,
+        y: 0.6,
+        rotation: -12,
+        finger: "thumb",
+      },
+      { legend: "", isExtraKey: true, y: 0.45, finger: "thumb" },
+      { legend: "←", isExtraKey: true, x: 1, y: 0.15, finger: "rightRing" },
+      { legend: "↓", isExtraKey: true, y: 0.3, finger: "rightPinky" },
+      { legend: "→", isExtraKey: true, y: 0.3, finger: "rightPinky" },
     ],
-  ),
-  cornixRow(
-    "row3",
-    [
-      { legend: "Caps", isExtraKey: true },
-      ...addLayoutKeys(3),
-      { layoutPosition: { col: 3 }, isHoming: true },
-      { layoutPosition: { col: 4 } },
-    ],
-    [
-      { layoutPosition: { col: 5 } },
-      { layoutPosition: { col: 6 }, isHoming: true },
-      ...addLayoutKeys(3, { start: 7 }),
-      { legend: EnterShort, isExtraKey: true },
-    ],
-  ),
-  cornixRow(
-    "row4",
-    [{ legend: Shift, isExtraKey: true }, ...addLayoutKeys(5)],
-    [
-      ...addLayoutKeys(5, { start: 5 }),
-      { layoutPosition: { row: "row3", col: 10 }, isExtraKey: true },
-    ],
-  ),
-  [
-    { legend: Ctrl, isExtraKey: true, y: 0.3 },
-    { legend: Meta, isExtraKey: true, y: 0.3 },
-    { legend: Alt, isExtraKey: true, y: 0.15 },
-    { legend: "", isExtraKey: true, x: 1, y: 0.45 },
-    {
-      isLayoutIndicator: true,
-      x: 4,
-      y: 0.6,
-      rotation: 12,
-      extraKeysOverride: { x: 0 },
-    },
-    { legend: " ", y: 0.85, rotation: 24 },
-    { legend: " ", x: 0.5, y: 0.85, rotation: -24 },
-    { legend: "Raise", isExtraKey: true, y: 0.6, rotation: -12 },
-    { legend: "", isExtraKey: true, y: 0.45 },
-    { legend: "←", isExtraKey: true, x: 1, y: 0.15 },
-    { legend: "↓", isExtraKey: true, y: 0.3 },
-    { legend: "→", isExtraKey: true, y: 0.3 },
-  ],
-];
+  ];
+}
 
 export const keymapLayouts: Partial<
   Record<KeymapStyle, Partial<Record<LayoutObject["type"], KeymapLayout>>>
@@ -563,7 +638,7 @@ export const keymapLayouts: Partial<
 
   alice: { iso: aliceIso, ansi: alice },
 
-  cornix: { iso: cornix, ansi: cornix },
+  cornix: { iso: buildCornix("iso"), ansi: buildCornix("ansi") },
 };
 
 function buildRow(
