@@ -18,6 +18,17 @@ export const Meta = formatForDisplay("Meta", options);
 export const Enter = "Enter";
 export const EnterShort = formatForDisplay("Enter", { platform: "mac" });
 
+export type Finger =
+  | "leftPinky"
+  | "leftRing"
+  | "leftMiddle"
+  | "leftIndex"
+  | "rightIndex"
+  | "rightMiddle"
+  | "rightRing"
+  | "rightPinky"
+  | "thumb";
+
 export type KeyDefinition = {
   legends: string[];
   /** width in u  */
@@ -33,6 +44,7 @@ export type KeyDefinition = {
   isLayoutIndicator?: boolean;
   isHoming?: boolean;
   align?: "top";
+  finger?: Finger;
 };
 export type KeyboardDefinition = KeyDefinition[][];
 

@@ -15,13 +15,27 @@ import {
 } from "../../../states/test";
 import { getTheme } from "../../../states/theme";
 import { cn } from "../../../utils/cn";
+import { blendTwoHexColors, hexToHSL } from "../../../utils/colors";
 import { isMacLike } from "../../../utils/misc";
 import { Anime } from "../../common/anime";
 import { Button } from "../../common/Button";
 import { convertLayoutToKeymap } from "./keymapConverter";
-import { KeyboardDefinition, KeyDefinition } from "./keymapLayouts";
+import { Finger, KeyboardDefinition, KeyDefinition } from "./keymapLayouts";
 
 const symbolsPattern = /^[^\p{L}\p{N}]{1}$/u;
+
+// mirrored fingers share a hue, blended into the theme so it fits any palette
+const fingerHues: Record<Finger, string> = {
+  leftPinky: "#b07cff",
+  rightPinky: "#b07cff",
+  leftRing: "#4fa3ff",
+  rightRing: "#4fa3ff",
+  leftMiddle: "#3fcf8e",
+  rightMiddle: "#3fcf8e",
+  leftIndex: "#ffb547",
+  rightIndex: "#ffb547",
+  thumb: "#9aa0a6",
+};
 
 export function Keymap() {
   return (
@@ -81,6 +95,7 @@ function Keyboard(props: { displayName: string; layoutData: LayoutObject }) {
       showAllKeys:
         getConfig.keymapKeys === "full" ||
         props.layoutData.matrixShowRightColumn === true,
+      fingerZones: getConfig.keymapFingerZones,
     }),
   );
 
@@ -210,41 +225,66 @@ function Key(
     prevKeyWasHighlighted = keyWasHighlighted;
   });
 
+  const showFingerZone = () => !isSteno() && props.finger !== undefined;
+
+  const idleBgColor = createMemo(() =>
+    showFingerZone()
+      ? blendTwoHexColors(
+          getTheme().subAlt,
+          fingerHues[props.finger as Finger],
+          0.45,
+        )
+      : getTheme().subAlt,
+  );
+
+  // pick whichever theme color contrasts most with the tinted key
+  const idleColor = createMemo(() => {
+    if (!showFingerZone()) return getTheme().sub;
+    const keyLightness = hexToHSL(idleBgColor()).lgt;
+    const { text, bg, sub } = getTheme();
+    return [text, bg, sub].reduce((best, color) =>
+      Math.abs(hexToHSL(color).lgt - keyLightness) >
+      Math.abs(hexToHSL(best).lgt - keyLightness)
+        ? color
+        : best,
+    );
+  });
+
   const baseKeyBgColor = () => {
     if (isFading()) {
       return getTheme().main;
     }
-    return isNext() ? getTheme().main : getTheme().subAlt;
+    return isNext() ? getTheme().main : idleBgColor();
   };
 
   const baseKeyColor = () => {
     if (isFading()) {
       return getTheme().bg;
     }
-    return isNext() ? getTheme().bg : getTheme().sub;
+    return isNext() ? getTheme().bg : idleColor();
   };
 
   const animKeyBgColor = createMemo(() => {
     if (isFading()) {
-      return [getTheme().main, getTheme().subAlt];
+      return [getTheme().main, idleBgColor()];
     }
     if (flashInfo().tick === 0) {
-      return [isNext() ? getTheme().main : getTheme().subAlt];
+      return [isNext() ? getTheme().main : idleBgColor()];
     }
     return [
       flashInfo().correct ? getTheme().main : getTheme().error,
-      isNext() ? getTheme().main : getTheme().subAlt,
+      isNext() ? getTheme().main : idleBgColor(),
     ];
   });
 
   const animKeyColor = createMemo(() => {
     if (isFading()) {
-      return [getTheme().bg, getTheme().sub];
+      return [getTheme().bg, idleColor()];
     }
     if (flashInfo().tick === 0) {
-      return [isNext() ? getTheme().bg : getTheme().sub];
+      return [isNext() ? getTheme().bg : idleColor()];
     }
-    return [getTheme().bg, isNext() ? getTheme().bg : getTheme().sub];
+    return [getTheme().bg, isNext() ? getTheme().bg : idleColor()];
   });
 
   // Don't apply reduced motion. If the user activates react/next they want animations.

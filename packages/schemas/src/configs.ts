@@ -486,6 +486,7 @@ export const ConfigSchema = z
     keymapLegendStyle: KeymapLegendStyleSchema,
     keymapKeys: KeymapKeysSchema,
     keymapSize: KeymapSizeSchema,
+    keymapFingerZones: z.boolean(),
 
     // theme
     flipTestColors: z.boolean(),

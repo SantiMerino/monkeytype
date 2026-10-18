@@ -1024,6 +1024,17 @@ export const configMetadata: ConfigMetadataObject = {
     overrideConfig: ({ currentConfig }) =>
       currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
   },
+  keymapFingerZones: {
+    key: "keymapFingerZones",
+    fa: { icon: "fa-hand-paper" },
+    displayString: "keymap finger zones",
+    changeRequiresRestart: false,
+    group: "appearance",
+    description:
+      "Colors each key by the finger that should press it. Mirrored fingers share a color and thumbs are shown on the space bar. Useful when learning to touch type, especially on split keyboards.",
+    overrideConfig: ({ currentConfig }) =>
+      currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
+  },
   keymapSize: {
     key: "keymapSize",
     fa: { icon: "fa-keyboard" },

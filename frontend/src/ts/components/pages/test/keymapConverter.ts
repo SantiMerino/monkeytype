@@ -2,6 +2,7 @@ import { KeymapStyle } from "@monkeytype/schemas/configs";
 import { KeyLegends, LayoutObject } from "@monkeytype/schemas/layouts";
 
 import {
+  Finger,
   KeyboardDefinition,
   KeyDefinition,
   KeymapLayout,
@@ -11,6 +12,7 @@ import {
 type ConvertOptions = {
   keymapStyle: KeymapStyle;
   showAllKeys: boolean;
+  fingerZones?: boolean;
 };
 
 export function convertLayoutToKeymap(
@@ -27,13 +29,64 @@ export function convertLayoutToKeymap(
 
   return convert({
     legends: layout.keys,
+    layoutType: layout.type,
     keymap: keymapLayout,
     convertOptions: options,
   });
 }
 
+// standard touch typing finger per physical column, left to right
+const columnFingers: Finger[] = [
+  "leftPinky",
+  "leftRing",
+  "leftMiddle",
+  "leftIndex",
+  "leftIndex",
+  "rightIndex",
+  "rightIndex",
+  "rightMiddle",
+  "rightRing",
+  "rightPinky",
+];
+
+export function getFinger(options: {
+  row: keyof LayoutObject["keys"];
+  col: number;
+  layoutType: LayoutObject["type"];
+  keymapStyle: KeymapStyle;
+  rotation?: number;
+}): Finger {
+  const { row, col, layoutType, keymapStyle, rotation } = options;
+  if (row === "row5") return "thumb";
+
+  const isMatrix = keymapStyle === "matrix" || keymapStyle === "split_matrix";
+
+  // number row and the iso extra key (left of z) shift columns by one
+  let column = col;
+  if (row === "row1" || (row === "row4" && layoutType === "iso" && !isMatrix)) {
+    column = col - 1;
+  }
+
+  let finger =
+    columnFingers[Math.min(Math.max(column, 0), columnFingers.length - 1)] ??
+    "rightPinky";
+
+  // alice duplicates the center key on both halves, the right half is rotated negative
+  if (
+    keymapStyle === "alice" &&
+    rotation !== undefined &&
+    rotation < 0 &&
+    finger === "leftIndex"
+  ) {
+    finger = "rightIndex";
+  }
+
+  return finger;
+}
+
 function convert(options: {
   legends: LayoutObject["keys"];
+  layoutType: LayoutObject["type"];
   keymap: KeymapLayout;
   convertOptions: ConvertOptions;
 }): KeyboardDefinition {
@@ -61,6 +114,21 @@ function convert(options: {
           ...(isShowAllKeys ? keyDef.extraKeysOverride : {}),
         };
 
+        let finger: Finger | undefined;
+        if (options.convertOptions.fingerZones !== true) {
+          finger = undefined;
+        } else if (final.isLayoutIndicator === true || keyDef.legend === " ") {
+          finger = "thumb";
+        } else if (keyDef.layoutPosition?.row !== undefined) {
+          finger = getFinger({
+            row: keyDef.layoutPosition.row,
+            col: keyDef.layoutPosition.col,
+            layoutType: options.layoutType,
+            keymapStyle: options.convertOptions.keymapStyle,
+            rotation: final.rotation,
+          });
+        }
+
         return {
           legends,
           ...(final.height !== undefined ? { height: final.height } : {}),
@@ -73,6 +141,7 @@ function convert(options: {
             : {}),
           ...(final.isHoming === true ? { isHoming: true } : {}),
           ...(final.align !== undefined ? { align: final.align } : {}),
+          ...(finger !== undefined ? { finger } : {}),
         } satisfies KeyDefinition;
       })
       //filter skipped keys

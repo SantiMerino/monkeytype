@@ -684,6 +684,12 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
     },
     alias: "keyboard",
   },
+  keymapFingerZones: {
+    subgroup: {
+      options: "fromSchema",
+    },
+    alias: "keyboard finger colors touch typing",
+  },
 
   //themes
   customTheme: {

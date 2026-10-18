@@ -1125,3 +1125,76 @@ describe("keymap converter", () => {
     });
   });
 });
+
+describe("finger zones", () => {
+  const fingersOf = (
+    keymapStyle: "staggered" | "split" | "matrix" | "split_matrix" | "alice",
+    layout: unknown,
+  ): string[][] =>
+    convertLayoutToKeymap(layout as LayoutObject, {
+      keymapStyle,
+      showAllKeys: false,
+      fingerZones: true,
+    }).map((row) => row.map((key) => `${key.legends[0]}:${key.finger ?? "-"}`));
+
+  it("omits fingers when disabled", () => {
+    const keys = convertLayoutToKeymap(qwertyLayout as LayoutObject, {
+      keymapStyle: "staggered",
+      showAllKeys: false,
+    }).flat();
+    expect(keys.some((key) => key.finger !== undefined)).toBe(false);
+  });
+
+  it("assigns standard fingers on qwerty staggered", () => {
+    const [row1, row2, row3, row4, row5] = fingersOf("staggered", qwertyLayout);
+    expect(row1?.slice(0, 6)).toEqual([
+      "1:leftPinky",
+      "2:leftRing",
+      "3:leftMiddle",
+      "4:leftIndex",
+      "5:leftIndex",
+      "6:rightIndex",
+    ]);
+    expect(row1?.at(-1)).toEqual("=:rightPinky");
+    expect(row2?.slice(3, 7)).toEqual([
+      "r:leftIndex",
+      "t:leftIndex",
+      "y:rightIndex",
+      "u:rightIndex",
+    ]);
+    expect(row2?.at(-1)).toEqual("]:rightPinky");
+    expect(row3?.slice(0, 4)).toEqual([
+      "a:leftPinky",
+      "s:leftRing",
+      "d:leftMiddle",
+      "f:leftIndex",
+    ]);
+    expect(row3?.at(-1)).toEqual("':rightPinky");
+    expect(row4?.slice(4, 6)).toEqual(["b:leftIndex", "n:rightIndex"]);
+    expect(row5).toEqual([" :thumb"]);
+  });
+
+  it("shifts iso bottom row for the extra key", () => {
+    const [, , , row4] = fingersOf("staggered", qwertzLayout);
+    expect(row4?.slice(0, 3)).toEqual([
+      "<:leftPinky",
+      "y:leftPinky",
+      "x:leftRing",
+    ]);
+  });
+
+  it("assigns both thumbs on split", () => {
+    const [, , , , row5] = fingersOf("split", qwertyLayout);
+    expect(row5).toEqual([" :thumb", " :thumb"]);
+  });
+
+  it("uses physical columns on iso matrix", () => {
+    const [, , , row4] = fingersOf("matrix", qwertzLayout);
+    expect(row4?.slice(0, 2)).toEqual(["<:leftPinky", "y:leftRing"]);
+  });
+
+  it("puts the duplicated alice center key on both hands", () => {
+    const [, , , row4] = fingersOf("alice", qwertyLayout);
+    expect(row4?.slice(4, 6)).toEqual(["b:leftIndex", "b:rightIndex"]);
+  });
+});
